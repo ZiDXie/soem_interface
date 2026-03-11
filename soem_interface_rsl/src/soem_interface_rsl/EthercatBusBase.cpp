@@ -370,6 +370,33 @@ struct EthercatBusBaseTemplateAdapter::EthercatSlaveBaseImpl {
     return ETHERCAT_SM_STATE::NONE;
   }
 
+    bool restart(std::atomic<bool>& abortFlag, const bool sizeCheck, int maxDiscoverRetries) {
+    if (initlialized_) {
+      {
+        std::lock_guard<std::mutex> guard(contextMutex_);
+        if (*ecatContext_.slavecount > 0) {
+          setStateLocked(EC_STATE_INIT);
+          waitForStateLocked(EC_STATE_INIT, 0, 2);
+        }
+      }
+      for (auto& slave : slaves_) {
+        slave->shutdown();
+      }
+    }
+    {
+      std::lock_guard<std::mutex> guard(contextMutex_);
+      if (ecatContext_.port != nullptr) {
+        MELO_INFO_STREAM("[soem_interface_rsl::" << name_ << "] Closing socket for restart ...");
+        ecx_close(&ecatContext_);
+        soem_interface_rsl::threadSleep(0.2);
+      }
+      initlialized_ = false;
+    }
+
+    MELO_INFO_STREAM("[soem_interface_rsl::" << name_ << "] Restarting bus ...");
+    return startup(abortFlag, sizeCheck, maxDiscoverRetries);
+  }
+  
   bool busIsOk() const { return workingCounterTooLowCounter_ < maxWorkingCounterTooLow_; }
 
   bool doBusMonitoring(bool logErrorCounterForDiagnosis) {
@@ -970,6 +997,11 @@ void EthercatBusBase::updateWrite() {
 void EthercatBusBase::shutdown() {
   pImpl_->shutdown();
   pImpl_.reset(nullptr);
+}
+
+bool EthercatBusBase::restart(bool sizeCheck, int maxDiscoverRetries) {
+  std::atomic<bool> tmpAtomicForStart{false};
+  return pImpl_->restart(tmpAtomicForStart, sizeCheck, maxDiscoverRetries);
 }
 
 void EthercatBusBase::setState(const uint16_t state, const uint16_t slave) {

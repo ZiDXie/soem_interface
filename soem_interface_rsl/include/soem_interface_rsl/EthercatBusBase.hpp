@@ -140,6 +140,15 @@ class SOEM_RSL_EXPORT EthercatBusBase : private EthercatBusBaseTemplateAdapter {
   bool startup(std::atomic<bool>& abortFlag, bool sizeCheck, int maxDiscoverRetries = 10);
 
   /*!
+   * Restart the bus communication: shutdown internally and startup again.
+   * Unlike shutdown(), this preserves the bus object for reuse.
+   * @param sizeCheck  perform a check of the Rx and Tx Pdo sizes
+   * @param maxDiscoverRetries number of retries for slave discovery
+   * @return True if successful.
+   */
+  bool restart(bool sizeCheck = true, int maxDiscoverRetries = 10);
+
+  /*!
    * Update step 1: Read all PDOs.
    */
   void updateRead();

@@ -6,7 +6,8 @@
 **
 ** This file is part of the soem_interface_rsl.
 **
-** The soem_interface_rsl is free software: you can redistribute it and/or modify
+** The soem_interface_rsl is free software: you can redistribute it and/or
+* modify
 ** it under the terms of the GNU General Public License as published by
 ** the Free Software Foundation, either version 3 of the License, or
 ** (at your option) any later version.
@@ -17,7 +18,8 @@
 ** GNU General Public License for more details.
 **
 ** You should have received a copy of the GNU General Public License
-** along with the soem_interface_rsl.  If not, see <https://www.gnu.org/licenses/>.
+** along with the soem_interface_rsl.  If not, see
+* <https://www.gnu.org/licenses/>.
 */
 
 //  anydrive
@@ -25,30 +27,36 @@
 
 namespace soem_interface_rsl {
 
-bool EthercatBusManagerBase::addEthercatBus(soem_interface_rsl::EthercatBusBase* bus) {
+bool EthercatBusManagerBase::addEthercatBus(
+    soem_interface_rsl::EthercatBusBase *bus) {
   if (bus == nullptr) {
-    MELO_ERROR_STREAM("[RokubiminiEthercatBusManager::addEthercatBus] bus is nullptr")
+    MELO_ERROR_STREAM(
+        "[RokubiminiEthercatBusManager::addEthercatBus] bus is nullptr")
     return false;
   }
 
   std::lock_guard<std::mutex> lock(busMutex_);
-  const auto& it = buses_.find(bus->getName());
+  const auto &it = buses_.find(bus->getName());
   if (it == buses_.end()) {
-    buses_.insert(std::make_pair(bus->getName(), std::unique_ptr<soem_interface_rsl::EthercatBusBase>(bus)));
+    buses_.insert(std::make_pair(
+        bus->getName(),
+        std::unique_ptr<soem_interface_rsl::EthercatBusBase>(bus)));
     return true;
   } else {
     return false;
   }
 }
 
-bool EthercatBusManagerBase::addEthercatBus(std::unique_ptr<soem_interface_rsl::EthercatBusBase> bus) {
+bool EthercatBusManagerBase::addEthercatBus(
+    std::unique_ptr<soem_interface_rsl::EthercatBusBase> bus) {
   if (bus == nullptr) {
-    MELO_ERROR_STREAM("[RokubiminiEthercatBusManager::addEthercatBus] bus is nullptr")
+    MELO_ERROR_STREAM(
+        "[RokubiminiEthercatBusManager::addEthercatBus] bus is nullptr")
     return false;
   }
 
   std::lock_guard<std::mutex> lock(busMutex_);
-  const auto& it = buses_.find(bus->getName());
+  const auto &it = buses_.find(bus->getName());
   if (it == buses_.end()) {
     buses_.insert(std::make_pair(bus->getName(), std::move(bus)));
     return true;
@@ -65,33 +73,38 @@ bool EthercatBusManagerBase::startupAllBuses() {
 
 void EthercatBusManagerBase::setBussesOperational() {
   std::lock_guard<std::mutex> lock(busMutex_);
-  // Only set the state but do not wait for it, since some devices (e.g. junctions) might not be able to reach it.
-  for (auto& bus : buses_) {
+  // Only set the state but do not wait for it, since some devices (e.g.
+  // junctions) might not be able to reach it.
+  for (auto &bus : buses_) {
     bus.second->setState(ETHERCAT_SM_STATE::OPERATIONAL);
   }
 }
 
 void EthercatBusManagerBase::setBussesPreOperational() {
   std::lock_guard<std::mutex> lock(busMutex_);
-  // Only set the state but do not wait for it, since some devices (e.g. junctions) might not be able to reach it.
-  for (auto& bus : buses_) {
+  // Only set the state but do not wait for it, since some devices (e.g.
+  // junctions) might not be able to reach it.
+  for (auto &bus : buses_) {
     bus.second->setState(ETHERCAT_SM_STATE::PRE_OP);
   }
 }
 
 void EthercatBusManagerBase::setBussesSafeOperational() {
   std::lock_guard<std::mutex> lock(busMutex_);
-  // Only set the state but do not wait for it, since some devices (e.g. junctions) might not be able to reach it.
-  for (auto& bus : buses_) {
+  // Only set the state but do not wait for it, since some devices (e.g.
+  // junctions) might not be able to reach it.
+  for (auto &bus : buses_) {
     bus.second->setState(ETHERCAT_SM_STATE::SAFE_OP);
   }
 }
 
-void EthercatBusManagerBase::waitForState(const uint16_t state, const uint16_t slave, const std::string busName,
+void EthercatBusManagerBase::waitForState(const uint16_t state,
+                                          const uint16_t slave,
+                                          const std::string busName,
                                           const unsigned int maxRetries) {
   std::lock_guard<std::mutex> lock(busMutex_);
   if (busName.empty()) {
-    for (auto& bus : buses_) {
+    for (auto &bus : buses_) {
       bus.second->waitForState(state, slave, maxRetries);
     }
   } else {
@@ -101,10 +114,16 @@ void EthercatBusManagerBase::waitForState(const uint16_t state, const uint16_t s
 
 bool EthercatBusManagerBase::startupCommunication() {
   std::lock_guard<std::mutex> lock(busMutex_);
-  for (auto& bus : buses_) {
+  for (auto &bus : buses_) {
     if (!bus.second->startup(true)) {
       MELO_ERROR_STREAM("Failed to startup bus '" << bus.first << "'.");
-      return false;
+      MELO_WARN_STREAM("Attempting to reconnect bus '"
+                       << bus.first << "' after startup failure.");
+      if (!bus.second->restart(true, 10)) {
+        MELO_ERROR_STREAM("Reconnect failed for bus '" << bus.first << "'.");
+        return false;
+      }
+      MELO_INFO_STREAM("Reconnect successful for bus '" << bus.first << "'.");
     }
   }
   return true;
@@ -112,26 +131,27 @@ bool EthercatBusManagerBase::startupCommunication() {
 
 void EthercatBusManagerBase::readAllBuses() {
   std::lock_guard<std::mutex> lock(busMutex_);
-  for (auto& bus : buses_) {
+  for (auto &bus : buses_) {
     bus.second->updateRead();
   }
 }
 
 void EthercatBusManagerBase::writeToAllBuses() {
   std::lock_guard<std::mutex> lock(busMutex_);
-  for (auto& bus : buses_) {
+  for (auto &bus : buses_) {
     bus.second->updateWrite();
   }
 }
 
 void EthercatBusManagerBase::shutdownAllBuses() {
   std::lock_guard<std::mutex> lock(busMutex_);
-  for (auto& bus : buses_) {
+  for (auto &bus : buses_) {
     bus.second->shutdown();
   }
 }
 
-std::unique_ptr<EthercatBusBase> EthercatBusManagerBase::extractBusByName(const std::string& name) {
+std::unique_ptr<EthercatBusBase>
+EthercatBusManagerBase::extractBusByName(const std::string &name) {
   std::unique_ptr<EthercatBusBase> busOut = std::move(buses_.at(name));
   buses_.erase(name);
   return busOut;
@@ -140,7 +160,7 @@ std::unique_ptr<EthercatBusBase> EthercatBusManagerBase::extractBusByName(const 
 EthercatBusManagerBase::BusMap EthercatBusManagerBase::extractBuses() {
   BusMap busMapOut;
 
-  for (auto& bus : buses_) {
+  for (auto &bus : buses_) {
     busMapOut.insert(std::make_pair(bus.first, std::move(bus.second)));
   }
 
@@ -149,7 +169,7 @@ EthercatBusManagerBase::BusMap EthercatBusManagerBase::extractBuses() {
 }
 
 bool EthercatBusManagerBase::allBusesAreOk() {
-  for (const auto& bus : buses_) {
+  for (const auto &bus : buses_) {
     if (!bus.second->busIsOk()) {
       return false;
     }
@@ -157,4 +177,4 @@ bool EthercatBusManagerBase::allBusesAreOk() {
   return true;
 }
 
-}  // namespace soem_interface_rsl
+} // namespace soem_interface_rsl
